@@ -1,15 +1,15 @@
 listener := listen(LISTEN_ADDR) or panic
 bind_iroh := || bind_iroh(IROH_PUBKEY).map(|conn| conn.open_bi)
 open_bi := mutex(bind_iroh() or panic)
-get_iroh_chan := || {
+get_iroh_chan := move || {
     open_bi := open_bi.lock()
     match (*open_bi)() {
 	ok(bi): return some(bi)
-	err(e): log(e)
+	err(e): log("couldn't open bi: {e}")
     }
-    new_open_bi := bind_iroh().inspect_err(|e| log(e))?
+    new_open_bi := bind_iroh().inspect_err(|e| log("couldn't bind iroh: {e}")).ok()?
     *open_bi = new_open_bi
-    (*open_bi)().inspect_err(|e| log(e)).ok()
+    (*open_bi)().inspect_err(|e| log("could't open bi again: {e}")).ok()
 }
 loop {
     listen_conn := listener.accept()
