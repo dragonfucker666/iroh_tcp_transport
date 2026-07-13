@@ -1,0 +1,29 @@
+listener := listen(LISTEN_ADDR) or panic
+bind_iroh := || bind_iroh(IROH_PUBKEY).map(|conn| conn.open_bi)
+open_bi := lock(bind_iroh() or panic)
+loop {
+    listen_conn := listener.accept()
+    run_thread {
+	should_reopen := false
+	{
+	    open_bi := open_bi.unlock()
+	    result := open_bi()
+	    if result is err {
+		match bind_iroh() {
+		    ok(new_open_bi): {
+			open_bi = new_open_bi
+			should_reopen = true
+		    }
+		    err(err): log(err)
+		}
+	    }
+	}
+	if should_reopen {
+	    result = open_bi()
+	}
+	match result {
+	    ok(iroh_chan): copy_bidir(iroh_chan, listen_conn)
+	    err(err): log(err)
+	}
+    }
+}
