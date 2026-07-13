@@ -1,0 +1,15 @@
+if not SECRET_KEY { // .map_or_else() - parse and unwrap or generate
+    SECRET_KEY = generate_secret_key()
+    log("secret key: ", SECRET_KEY)
+    log("public key: ", SECRET_KEY.derive_public())
+}
+accept_iroh := || build_endpoint().alpns(ALPN).secret_key(SECRET_KEY).map(|endpoint| endpoint.accept)
+loop {
+    listen_streams := accept_iroh() or continue
+    run_thread {
+	listen_stream := listen_streams.accept_bi()
+	run_thread {
+	    copy_bidir(listen_stream, tcp_connect(SEND_ADDR) or return)
+	}
+    }
+}
