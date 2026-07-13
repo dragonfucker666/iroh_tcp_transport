@@ -14,7 +14,8 @@ async fn main() {
     };
     println!("public key: {}", secret_key.public());
     // Building tools
-    let iroh_endpoint = iroh_tcp_transport::build_endpoint().alpns(vec![iroh_tcp_transport::ALPN.to_vec()]).secret_key(secret_key).bind().await.expect("couldn't bind own iroh endpoint");
+    let (builder, _maybe_relay_url) = iroh_tcp_transport::build_endpoint();
+    let iroh_endpoint = builder.alpns(vec![iroh_tcp_transport::ALPN.to_vec()]).secret_key(secret_key).bind().await.expect("couldn't bind own iroh endpoint");
     // Listening
     println!("Listening on iroh");
     loop {
@@ -25,7 +26,9 @@ async fn main() {
             loop {
                 let Some(listen_stream) = reduce_err(conn.accept_bi().await, "couldn't accept iroh conn") else { return; };
                 let Some(send_stream) = reduce_err(tokio::net::TcpStream::connect(&*send_addr).await, "couldn't connect to iroh conn") else { return; };
-                tokio::spawn(iroh_tcp_transport::copy_bidir(listen_stream, send_stream));
+                tokio::spawn(async move {
+                    _ = reduce_err(iroh_tcp_transport::copy_bidir(listen_stream, send_stream).await, "couldn't copy bidir");
+                });
             }
         });
     }
