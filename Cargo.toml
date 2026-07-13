@@ -1,0 +1,8 @@
+[package]
+name = "iroh_tcp_transport"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iroh = "1.0.2"
+tokio = "1.52.3"
