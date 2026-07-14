@@ -4,6 +4,7 @@ use iroh_tcp_transport::reduce_err;
 async fn main() {
     // Collecting params
     let send_addr = std::sync::Arc::new(std::env::var("SEND_ADDR").expect("SEND_ADDR env var should be provided"));
+    let iroh_relay_url = std::env::var("IROH_RELAY_URL").ok();
     let secret_key = match std::env::var("SECRET_KEY") {
         Err(_e) => {
             let secret_key = iroh::SecretKey::generate();
@@ -14,9 +15,13 @@ async fn main() {
     };
     println!("public key: {}", secret_key.public());
     // Building tools
-    let (builder, _maybe_relay_url) = iroh_tcp_transport::build_endpoint();
-    let iroh_endpoint = builder.alpns(vec![iroh_tcp_transport::ALPN.to_vec()]).secret_key(secret_key).bind().await.expect("couldn't bind own iroh endpoint");
-    // Listening
+    let mut builder = iroh::Endpoint::builder(iroh::endpoint::presets::N0).alpns(vec![iroh_tcp_transport::ALPN.to_vec()]).secret_key(secret_key);
+    if let Some(iroh_relay_url) = iroh_relay_url {
+        let iroh_relay_url: iroh::RelayUrl = iroh_relay_url.parse().unwrap();
+        builder = builder.relay_mode(iroh::RelayMode::Custom(iroh_relay_url.into()));
+    }
+    let iroh_endpoint = builder.bind().await.expect("couldn't bind own iroh endpoint");
+    // Starting the server
     println!("Listening on iroh");
     loop {
         let incoming_listener = iroh_endpoint.accept().await.unwrap();

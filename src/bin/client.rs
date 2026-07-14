@@ -5,13 +5,13 @@ async fn main() {
     // Collecting params
     let listen_addr = std::env::var("LISTEN_ADDR").expect("LISTEN_ADDR env var should be provided");
     let iroh_endpoint_id: iroh::EndpointId = std::env::var("IROH_PUBKEY").expect("IROH_PUBKEY env var should be provided").parse().unwrap();
-    let (builder, relay_url) = iroh_tcp_transport::build_endpoint();
-    let mut iroh_endpoint_addr = iroh::EndpointAddr::new(iroh_endpoint_id);
-    if let Some(relay_url) = relay_url {
-        iroh_endpoint_addr = iroh_endpoint_addr.with_relay_url(relay_url);
-    }
-    let endpoint = builder.bind().await.expect("couldn't bind own iroh endpoint");
+    let iroh_relay_url = std::env::var("IROH_RELAY_URL").ok();
     // Building tools
+    let mut iroh_endpoint_addr = iroh::EndpointAddr::new(iroh_endpoint_id);
+    if let Some(iroh_relay_url) = iroh_relay_url {
+        iroh_endpoint_addr = iroh_endpoint_addr.with_relay_url(iroh_relay_url.parse().unwrap())
+    }
+    let endpoint = iroh::Endpoint::builder(iroh::endpoint::presets::N0).bind().await.expect("couldn't bind own iroh endpoint");
     let get_send_stream = {
         let connect_iroh = async move || reduce_err(endpoint.connect(iroh_endpoint_addr.clone(), iroh_tcp_transport::ALPN).await, "couldn't send iroh conn").map(move |conn| async move || conn.open_bi().await);
         let open_bi = tokio::sync::Mutex::new(connect_iroh().await.unwrap());
